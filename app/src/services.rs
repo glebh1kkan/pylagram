@@ -7,7 +7,7 @@ pub trait FeatureService {
 }
 
 /// In-memory registry of feature business services.
-#[derive(Debug, Clone, Default)]
+#[derive(Default)]
 pub struct App {
     services: Vec<Box<dyn FeatureService>>,
 }
