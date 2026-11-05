@@ -1,0 +1,10 @@
+[package]
+name = "telesrv"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "telesrv"
+path = "src/main.rs"
+
+[dependencies]

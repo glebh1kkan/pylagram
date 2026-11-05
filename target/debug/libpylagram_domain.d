@@ -1,0 +1,1 @@
+/root/PylaGram/target/debug/libpylagram_domain.rlib: /root/PylaGram/domain/src/account.rs /root/PylaGram/domain/src/gift.rs /root/PylaGram/domain/src/lib.rs /root/PylaGram/domain/src/message.rs /root/PylaGram/domain/src/premium.rs /root/PylaGram/domain/src/user.rs

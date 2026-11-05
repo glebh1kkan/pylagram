@@ -1,0 +1,1 @@
+/root/PylaGram/target/debug/libpylagram_app.rlib: /root/PylaGram/app/src/ai.rs /root/PylaGram/app/src/auth.rs /root/PylaGram/app/src/bots.rs /root/PylaGram/app/src/calls.rs /root/PylaGram/app/src/channels.rs /root/PylaGram/app/src/gifts.rs /root/PylaGram/app/src/lib.rs /root/PylaGram/app/src/messages.rs /root/PylaGram/app/src/stars.rs

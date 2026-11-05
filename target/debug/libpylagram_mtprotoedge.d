@@ -1,0 +1,1 @@
+/root/PylaGram/target/debug/libpylagram_mtprotoedge.rlib: /root/PylaGram/mtprotoedge/src/crypto.rs /root/PylaGram/mtprotoedge/src/framing.rs /root/PylaGram/mtprotoedge/src/handshake.rs /root/PylaGram/mtprotoedge/src/lib.rs /root/PylaGram/mtprotoedge/src/transport.rs /root/PylaGram/mtprotoedge/src/wrappers.rs
