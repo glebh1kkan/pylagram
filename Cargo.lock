@@ -503,6 +503,7 @@ dependencies = [
 name = "telesrv"
 version = "0.1.0"
 dependencies = [
+ "pylagram-mtprotoedge",
  "tokio",
 ]
 

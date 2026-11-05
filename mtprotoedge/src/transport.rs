@@ -13,6 +13,6 @@ pub async fn bind(addr: SocketAddr) -> std::io::Result<TcpListener> {
 }
 
 /// Accepts connections — placeholder for the accept loop.
-pub async fn accept(listener: TcpListener) -> std::io::Result<(TcpStream, SocketAddr)> {
+pub async fn accept(listener: &TcpListener) -> std::io::Result<(TcpStream, SocketAddr)> {
     listener.accept().await
 }
