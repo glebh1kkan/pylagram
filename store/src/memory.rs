@@ -1,12 +1,13 @@
 //! PylaGram — storage layer: in-memory implementation.
 
 use std::collections::HashMap;
+use std::sync::Mutex;
 
 use crate::interfaces::Store;
 
 #[derive(Debug, Default)]
 pub struct InMemoryStore {
-    data: HashMap<String, Vec<u8>>,
+    data: Mutex<HashMap<String, Vec<u8>>>,
 }
 
 impl InMemoryStore {
@@ -17,11 +18,13 @@ impl InMemoryStore {
 
 impl Store for InMemoryStore {
     fn get(&self, key: &str) -> Option<Vec<u8>> {
-        self.data.get(key).cloned()
+        self.data.lock().ok()?.get(key).cloned()
     }
 
     fn set(&self, key: &str, value: &[u8]) {
-        self.data.insert(key.to_string(), value.to_vec());
+        if let Ok(mut guard) = self.data.lock() {
+            guard.insert(key.to_string(), value.to_vec());
+        }
     }
 }
 
