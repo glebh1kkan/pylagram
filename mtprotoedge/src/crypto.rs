@@ -51,6 +51,25 @@ pub fn decrypt(key: &[u8; 32], nonce: &[u8; 12], ciphertext: &[u8]) -> Option<Ve
     cipher.decrypt(&nonce, ciphertext).ok()
 }
 
+/// Encrypts an application payload as an MTProto message body: derives the
+/// message key from the session key + nonce and applies AES-256-GCM.
+pub fn encrypt_message(session_key: &[u8; 32], nonce: &[u8], plaintext: &[u8]) -> Vec<u8> {
+    let msg_key = derive_msg_key(session_key, nonce);
+    let mut nonce12 = [0u8; 12];
+    let n = nonce.len().min(12);
+    nonce12[..n].copy_from_slice(&nonce[..n]);
+    encrypt(&msg_key, &nonce12, plaintext)
+}
+
+/// Decrypts an MTProto message body produced by [`encrypt_message`].
+pub fn decrypt_message(session_key: &[u8; 32], nonce: &[u8], ciphertext: &[u8]) -> Option<Vec<u8>> {
+    let msg_key = derive_msg_key(session_key, nonce);
+    let mut nonce12 = [0u8; 12];
+    let n = nonce.len().min(12);
+    nonce12[..n].copy_from_slice(&nonce[..n]);
+    decrypt(&msg_key, &nonce12, ciphertext)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -64,5 +83,26 @@ mod tests {
         let decrypted = decrypt(&key, &nonce, &ciphertext).expect("decrypt failed");
         assert_eq!(decrypted, plaintext);
     }
+
+    #[test]
+    fn message_roundtrip() {
+        let session_key = [9u8; 32];
+        let nonce = [5u8; 8];
+        let plaintext = b"mtproto payload";
+        let ciphertext = encrypt_message(&session_key, &nonce, plaintext);
+        let decrypted = decrypt_message(&session_key, &nonce, &ciphertext).expect("decrypt failed");
+        assert_eq!(decrypted, plaintext);
+    }
+
+    #[test]
+    fn message_roundtrip_zero_nonce() {
+        let session_key = [1u8; 32];
+        let nonce = [0u8; 8];
+        let plaintext = b"zero nonce";
+        let ciphertext = encrypt_message(&session_key, &nonce, plaintext);
+        let decrypted = decrypt_message(&session_key, &nonce, &ciphertext).expect("decrypt failed");
+        assert_eq!(decrypted, plaintext);
+    }
 }
+
 
