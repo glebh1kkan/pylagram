@@ -6,3 +6,4 @@ pub mod handshake;
 pub mod crypto;
 pub mod framing;
 pub mod wrappers;
+pub mod session;
