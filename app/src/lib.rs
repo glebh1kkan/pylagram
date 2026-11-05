@@ -9,3 +9,4 @@ pub mod gifts;
 pub mod bots;
 pub mod calls;
 pub mod ai;
+pub mod services;
