@@ -1,1 +1,1 @@
-/root/PylaGram/target/debug/telesrv: /root/PylaGram/cmd/telesrv/src/main.rs
+/root/PylaGram/target/debug/telesrv: /root/PylaGram/cmd/telesrv/src/main.rs /root/PylaGram/mtprotoedge/src/crypto.rs /root/PylaGram/mtprotoedge/src/framing.rs /root/PylaGram/mtprotoedge/src/handshake.rs /root/PylaGram/mtprotoedge/src/lib.rs /root/PylaGram/mtprotoedge/src/session.rs /root/PylaGram/mtprotoedge/src/transport.rs /root/PylaGram/mtprotoedge/src/wrappers.rs

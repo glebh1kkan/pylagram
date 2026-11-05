@@ -8,7 +8,7 @@ use pylagram_mtprotoedge::{session::Session, transport};
 pub async fn serve(addr: SocketAddr) -> std::io::Result<()> {
     let listener = transport::bind(addr).await?;
     loop {
-        let (stream, peer) = transport::accept(listener).await?;
+        let (stream, peer) = transport::accept(&listener).await?;
         tokio::spawn(async move {
             let mut session = Session::new();
             let hello = session.begin();
