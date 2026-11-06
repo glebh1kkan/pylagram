@@ -325,6 +325,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "pylagram-admin"
+version = "0.1.0"
+dependencies = [
+ "tokio",
+]
+
+[[package]]
 name = "pylagram-app"
 version = "0.1.0"
 
@@ -503,6 +510,7 @@ dependencies = [
 name = "telesrv"
 version = "0.1.0"
 dependencies = [
+ "pylagram-admin",
  "pylagram-mtprotoedge",
  "tokio",
 ]

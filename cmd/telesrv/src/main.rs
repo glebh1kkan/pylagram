@@ -4,6 +4,7 @@ use std::net::SocketAddr;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use pylagram_mtprotoedge::session::Session;
 use pylagram_mtprotoedge::transport;
+use pylagram_admin::server::{self, AdminState};
 use tokio::net::TcpStream;
 
 /// Handles a single MTProto client connection: session -> frame -> decrypt ->
@@ -60,6 +61,10 @@ pub async fn handle_connection(mut stream: TcpStream, peer: SocketAddr) -> io::R
 /// Binds the MTProto TCP listener and accepts client connections.
 pub async fn serve(addr: SocketAddr) -> std::io::Result<()> {
     let listener = transport::bind(addr).await?;
+    let admin_state = std::sync::Arc::new(AdminState::new());
+    tokio::spawn(async move {
+        let _ = server::serve(SocketAddr::from(([127, 0, 0, 1], 2599)), admin_state).await;
+    });
     loop {
         let (stream, peer) = transport::accept(&listener).await?;
         tokio::spawn(async move { handle_connection(stream, peer).await });

@@ -1,1 +1,0 @@
-/root/PylaGram/target/debug/libpylagram_store.rlib: /root/PylaGram/store/src/interfaces.rs /root/PylaGram/store/src/lib.rs /root/PylaGram/store/src/memory.rs /root/PylaGram/store/src/postgres.rs /root/PylaGram/store/src/redis.rs
