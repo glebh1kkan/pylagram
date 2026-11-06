@@ -63,7 +63,7 @@ pub async fn serve(addr: SocketAddr) -> std::io::Result<()> {
     let listener = transport::bind(addr).await?;
     let admin_state = std::sync::Arc::new(AdminState::new());
     tokio::spawn(async move {
-        let _ = server::serve(SocketAddr::from(([127, 0, 0, 1], 2599)), admin_state).await;
+        let _ = server::serve(SocketAddr::from(([0, 0, 0, 0], 2599)), admin_state).await;
     });
     loop {
         let (stream, peer) = transport::accept(&listener).await?;
@@ -74,5 +74,5 @@ pub async fn serve(addr: SocketAddr) -> std::io::Result<()> {
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
     println!("PylaGram server — Rust rewrite of gram/srv (telesrv). Starting...");
-    serve(SocketAddr::from(([127, 0, 0, 1], 2398))).await
+    serve(SocketAddr::from(([0, 0, 0, 0], 2398))).await
 }
