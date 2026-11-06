@@ -92,6 +92,7 @@ async fn handle(mut stream: TcpStream, state: Arc<AdminState>) -> io::Result<()>
     };
     state.requests.fetch_add(1, Ordering::Relaxed);
 
+    let mut login_token: Option<String> = None;
     let (status, ctype, response_body) = if path == "/admin" && method == "GET" {
         (
             "200 OK".to_string(),
@@ -117,9 +118,10 @@ async fn handle(mut stream: TcpStream, state: Arc<AdminState>) -> io::Result<()>
         )
     } else if path.starts_with("/api") {
         if !api::is_public(&path_only) {
-            let token_value = state.service.get("admin_session_token");
-            let token = token_value.as_str().unwrap_or("");
-            if token.is_empty() {
+            let token = extract_token(&req);
+            let stored = state.service.get("admin_session_token");
+            let stored_str = stored.as_str().unwrap_or("");
+            if token.is_empty() || token != stored_str {
                 let body = serde_json::to_vec(&json!({ "error": "unauthorized" })).unwrap();
                 let resp = format!(
                     "HTTP/1.1 401 Unauthorized\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
@@ -132,6 +134,9 @@ async fn handle(mut stream: TcpStream, state: Arc<AdminState>) -> io::Result<()>
             }
         }
         let (s, value) = api::handle(&method, &path_only, Some(query.as_str()), Some(body), &state);
+        if method == "POST" && path_only == "/api/login" {
+            login_token = value.get("csrf_token").and_then(|t| t.as_str()).map(|s| s.to_string());
+        }
         let status_text = match s {
             200 => "200 OK",
             401 => "401 Unauthorized",
@@ -154,11 +159,15 @@ async fn handle(mut stream: TcpStream, state: Arc<AdminState>) -> io::Result<()>
         }
     };
 
-    let resp = format!(
-        "HTTP/1.1 {}\r\nContent-Type: {}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+    let mut head = format!(
+        "HTTP/1.1 {}\r\nContent-Type: {}\r\nContent-Length: {}\r\nConnection: close\r\n",
         status, ctype, response_body.len()
     );
-    let mut resp = resp.into_bytes();
+    if let Some(token) = &login_token {
+        head.push_str(&format!("Set-Cookie: telesrv_admin_session={}; Path=/; Max-Age=86400\r\n", token));
+    }
+    head.push_str("\r\n");
+    let mut resp = head.into_bytes();
     resp.extend_from_slice(&response_body);
     stream.write_all(&resp).await?;
     Ok(())
@@ -175,6 +184,30 @@ fn content_length(req: &str) -> usize {
         }
     }
     0
+}
+
+fn extract_token(req: &str) -> String {
+    for line in req.split("\r\n") {
+        if let Some((key, value)) = line.split_once(':') {
+            let k = key.trim().to_lowercase();
+            let v = value.trim();
+            if k == "authorization" {
+                if let Some(rest) = v.strip_prefix("Bearer ") {
+                    return rest.trim().to_string();
+                }
+            }
+            if k == "cookie" {
+                for pair in v.split(',') {
+                    if let Some((ck, cv)) = pair.split_once('=') {
+                        if ck.trim() == "telesrv_admin_session" {
+                            return cv.trim().to_string();
+                        }
+                    }
+                }
+            }
+        }
+    }
+    String::new()
 }
 
 fn content_type_for(path: &str) -> &'static str {
