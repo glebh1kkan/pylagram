@@ -13,6 +13,8 @@ use tokio::net::{TcpListener, TcpStream};
 use super::api;
 use super::service::AdminService;
 
+const WEB_DIST_DIR: &str = "/root/PylaGram/admin/web-dist";
+
 #[derive(Debug)]
 pub struct AdminState {
     pub service: Arc<AdminService>,
@@ -91,23 +93,28 @@ async fn handle(mut stream: TcpStream, state: Arc<AdminState>) -> io::Result<()>
 
     let (status, ctype, response_body) = if path == "/admin" && method == "GET" {
         (
-            "200 OK",
-            "text/html; charset=utf-8",
-            DASHBOARD_HTML.to_string(),
+            "200 OK".to_string(),
+            "text/html; charset=utf-8".to_string(),
+            DASHBOARD_HTML.as_bytes().to_vec(),
         )
     } else if path == "/admin/health" && method == "GET" {
-        ("200 OK", "application/json", r#"{"ok":true}"#.to_string())
+        (
+            "200 OK".to_string(),
+            "application/json".to_string(),
+            r#"{"ok":true}"#.as_bytes().to_vec(),
+        )
     } else if path == "/admin/stats" && method == "GET" {
         (
-            "200 OK",
-            "application/json",
+            "200 OK".to_string(),
+            "application/json".to_string(),
             format!(
                 r#"{{"started_at":"{}","requests":{}}}"#,
                 state.started_at.elapsed().as_secs(),
                 state.requests.load(Ordering::Relaxed)
-            ),
+            )
+            .into_bytes(),
         )
-    } else {
+    } else if path.starts_with("/api") {
         let (s, value) = api::handle(&method, &path_only, Some(query.as_str()), Some(body), &state);
         let status_text = match s {
             200 => "200 OK",
@@ -116,20 +123,28 @@ async fn handle(mut stream: TcpStream, state: Arc<AdminState>) -> io::Result<()>
             _ => "200 OK",
         };
         (
-            status_text,
-            "application/json",
-            serde_json::to_string(&value).unwrap_or_else(|_| "{}".to_string()),
+            status_text.to_string(),
+            "application/json".to_string(),
+            serde_json::to_vec(&value).unwrap_or_else(|_| b"{}".to_vec()),
         )
+    } else {
+        match serve_static(&path_only) {
+            Some((ct, bytes)) => ("200 OK".to_string(), ct, bytes),
+            None => (
+                "404 Not Found".to_string(),
+                "text/plain; charset=utf-8".to_string(),
+                b"not_found".to_vec(),
+            ),
+        }
     };
 
     let resp = format!(
-        "HTTP/1.1 {}\r\nContent-Type: {}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
-        status,
-        ctype,
-        response_body.len(),
-        response_body
+        "HTTP/1.1 {}\r\nContent-Type: {}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+        status, ctype, response_body.len()
     );
-    stream.write_all(resp.as_bytes()).await?;
+    let mut resp = resp.into_bytes();
+    resp.extend_from_slice(&response_body);
+    stream.write_all(&resp).await?;
     Ok(())
 }
 
@@ -144,6 +159,42 @@ fn content_length(req: &str) -> usize {
         }
     }
     0
+}
+
+fn content_type_for(path: &str) -> &'static str {
+    let ext = path.rsplit('.').next().unwrap_or("");
+    match ext {
+        "html" => "text/html; charset=utf-8",
+        "js" => "text/javascript; charset=utf-8",
+        "css" => "text/css; charset=utf-8",
+        "json" => "application/json; charset=utf-8",
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "gif" => "image/gif",
+        "svg" => "image/svg+xml",
+        "webp" => "image/webp",
+        "woff2" => "font/woff2",
+        "woff" => "font/woff",
+        "ttf" => "font/ttf",
+        "txt" => "text/plain; charset=utf-8",
+        _ => "application/octet-stream",
+    }
+}
+
+fn serve_static(path: &str) -> Option<(String, Vec<u8>)> {
+    let rel = path.trim_start_matches('/');
+    let rel = rel.split('?').next().unwrap_or(rel);
+    let safe_rel = if rel.is_empty() { "index.html".to_string() } else { rel.to_string() };
+    let full = std::path::Path::new(WEB_DIST_DIR).join(&safe_rel);
+    if full.components().any(|c| {
+        let s = c.as_os_str().to_string_lossy().to_string();
+        s == ".."
+    }) {
+        return None;
+    }
+    let bytes = std::fs::read(&full).ok()?;
+    let ct = content_type_for(&safe_rel).to_string();
+    Some((ct, bytes))
 }
 
 fn parse_request_line(req: &str) -> (String, String, String) {
@@ -172,5 +223,24 @@ mod tests {
         let (status, value) = api::handle("GET", "/api/does-not-exist", None, None, &state);
         assert_eq!(status, 404);
         assert_eq!(value["error"], "not_found");
+    }
+
+    #[test]
+    fn static_serves_index_for_root() {
+        let (ct, bytes) = serve_static("/").unwrap();
+        assert!(ct.starts_with("text/html"));
+        assert!(!bytes.is_empty());
+    }
+
+    #[test]
+    fn static_serves_asset() {
+        let (ct, bytes) = serve_static("/assets/index-CUtowJ4h.js").unwrap();
+        assert_eq!(ct, "text/javascript; charset=utf-8");
+        assert!(!bytes.is_empty());
+    }
+
+    #[test]
+    fn static_blocks_traversal() {
+        assert!(serve_static("/../etc/passwd").is_none());
     }
 }
