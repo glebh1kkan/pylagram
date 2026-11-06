@@ -184,7 +184,14 @@ fn content_type_for(path: &str) -> &'static str {
 fn serve_static(path: &str) -> Option<(String, Vec<u8>)> {
     let rel = path.trim_start_matches('/');
     let rel = rel.split('?').next().unwrap_or(rel);
-    let safe_rel = if rel.is_empty() { "index.html".to_string() } else { rel.to_string() };
+    let trimmed = rel.trim_end_matches('/');
+    let safe_rel = if trimmed.is_empty() {
+        "index.html".to_string()
+    } else if rel.ends_with('/') {
+        format!("{}/index.html", trimmed)
+    } else {
+        trimmed.to_string()
+    };
     let full = std::path::Path::new(WEB_DIST_DIR).join(&safe_rel);
     if full.components().any(|c| {
         let s = c.as_os_str().to_string_lossy().to_string();
