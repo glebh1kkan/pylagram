@@ -169,7 +169,7 @@ mod tests {
     #[test]
     fn api_unknown_route_is_not_found() {
         let state = Arc::new(AdminState::new());
-        let (status, value) = api::handle("GET", "/api/does-not-exist", None, &state);
+        let (status, value) = api::handle("GET", "/api/does-not-exist", None, None, &state);
         assert_eq!(status, 404);
         assert_eq!(value["error"], "not_found");
     }
