@@ -7,6 +7,10 @@ use super::server::AdminState;
 
 type HandlerResult = (u16, Value);
 
+pub fn is_public(path: &str) -> bool {
+    path == "/api/login" || path == "/api/session" || path == "/api/logout"
+}
+
 fn query_params(query: &str) -> HashMap<String, String> {
     let mut map = HashMap::new();
     for pair in query.split('&') {

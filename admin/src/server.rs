@@ -7,6 +7,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use serde_json;
+use serde_json::json;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 
@@ -115,6 +116,21 @@ async fn handle(mut stream: TcpStream, state: Arc<AdminState>) -> io::Result<()>
             .into_bytes(),
         )
     } else if path.starts_with("/api") {
+        if !api::is_public(&path_only) {
+            let token_value = state.service.get("admin_session_token");
+            let token = token_value.as_str().unwrap_or("");
+            if token.is_empty() {
+                let body = serde_json::to_vec(&json!({ "error": "unauthorized" })).unwrap();
+                let resp = format!(
+                    "HTTP/1.1 401 Unauthorized\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                    body.len()
+                );
+                let mut resp = resp.into_bytes();
+                resp.extend_from_slice(&body);
+                stream.write_all(&resp).await?;
+                return Ok(());
+            }
+        }
         let (s, value) = api::handle(&method, &path_only, Some(query.as_str()), Some(body), &state);
         let status_text = match s {
             200 => "200 OK",
