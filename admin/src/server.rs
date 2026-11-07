@@ -235,7 +235,9 @@ fn serve_static(path: &str) -> Option<(String, Vec<u8>)> {
     let rel = rel.split('?').next().unwrap_or(rel);
     let trimmed = rel.trim_end_matches('/');
     let safe_rel = if trimmed.is_empty() {
-        "index.html".to_string()
+        // The panel entry is the custom PylaGram design (web-dist/new), not the
+        // upstream gram/srv prebuilt SPA that used to live at the web-dist root.
+        "new/index.html".to_string()
     } else if rel.ends_with('/') {
         format!("{}/index.html", trimmed)
     } else {
