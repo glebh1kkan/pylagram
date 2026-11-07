@@ -11,3 +11,4 @@ path = "src/main.rs"
 tokio = { version = "1", features = ["full"] }
 pylagram-mtprotoedge = { path = "../../mtprotoedge" }
 pylagram-admin = { path = "../../admin" }
+pylagram-rpc = { path = "../../rpc" }

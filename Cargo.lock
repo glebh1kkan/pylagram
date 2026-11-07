@@ -567,6 +567,7 @@ version = "0.1.0"
 dependencies = [
  "pylagram-admin",
  "pylagram-mtprotoedge",
+ "pylagram-rpc",
  "tokio",
 ]
 

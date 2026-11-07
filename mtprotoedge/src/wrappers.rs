@@ -6,6 +6,11 @@
 //! msg-id-targeted invokes.
 //! (Rust rewrite of the wrappers layer of `telsrv/internal/mtprotoedge`.)
 
+use crate::framing::{
+    MSG_TYPE_INIT_CONNECTION, MSG_TYPE_INVOKE_AFTER, MSG_TYPE_INVOKE_AFTER_MSGS, MSG_TYPE_INVOKE_WITH_LAYER,
+    MSG_TYPE_INVOKE_WITHOUT_UPDATES,
+};
+
 /// Wrapper kinds applied to decrypted inbound MTProto message bodies.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MsgKind {
@@ -27,6 +32,30 @@ impl MsgKind {
             MsgKind::InvokeWithLayer => "invoke_with_layer",
             MsgKind::InitConnection => "init_connection",
             MsgKind::InvokeAfter => "invoke_after",
+        }
+    }
+
+    /// Maps an inbound MTProto message type onto the wrapper kind that the
+    /// RPC dispatch has to apply for the decrypted body.
+    ///
+    /// - `initConnection` envelopes carry the raw connection init blob;
+    /// - `invokeWithLayer` envelopes carry `[layer: i32 BE][rpc]`;
+    /// - `invokeWithoutUpdates` / naked invokes carry the plain RPC;
+    /// - `invokeAfter` / `invokeAfterMsgs` envelopes carry `[msg_id: u64 BE][rpc]`.
+    ///
+    /// Any other message type (RPC results, containers, gzip, ...) resolves to
+    /// the plain-invoke kind and is handled by the RPC layer as such.
+    pub fn from_msg_type(msg_type: i32) -> Self {
+        if msg_type == MSG_TYPE_INIT_CONNECTION {
+            Self::InitConnection
+        } else if msg_type == MSG_TYPE_INVOKE_WITH_LAYER {
+            Self::InvokeWithLayer
+        } else if msg_type == MSG_TYPE_INVOKE_WITHOUT_UPDATES {
+            Self::Invoke
+        } else if msg_type == MSG_TYPE_INVOKE_AFTER || msg_type == MSG_TYPE_INVOKE_AFTER_MSGS {
+            Self::InvokeAfter
+        } else {
+            Self::Invoke
         }
     }
 }
@@ -194,5 +223,17 @@ mod tests {
         assert_eq!(MsgKind::InvokeWithLayer.name(), "invoke_with_layer");
         assert_eq!(MsgKind::InitConnection.name(), "init_connection");
         assert_eq!(MsgKind::InvokeAfter.name(), "invoke_after");
+    }
+
+    #[test]
+    fn msg_kind_from_msg_type_maps_wrappers() {
+        assert_eq!(MsgKind::from_msg_type(crate::framing::MSG_TYPE_INIT_CONNECTION), MsgKind::InitConnection);
+        assert_eq!(MsgKind::from_msg_type(crate::framing::MSG_TYPE_INVOKE_WITH_LAYER), MsgKind::InvokeWithLayer);
+        assert_eq!(MsgKind::from_msg_type(crate::framing::MSG_TYPE_INVOKE_WITHOUT_UPDATES), MsgKind::Invoke);
+        assert_eq!(MsgKind::from_msg_type(crate::framing::MSG_TYPE_INVOKE_AFTER), MsgKind::InvokeAfter);
+        assert_eq!(MsgKind::from_msg_type(crate::framing::MSG_TYPE_INVOKE_AFTER_MSGS), MsgKind::InvokeAfter);
+        // Results / containers / gzip fall back to the plain invoke kind.
+        assert_eq!(MsgKind::from_msg_type(crate::framing::MSG_TYPE_RPC_RESULT), MsgKind::Invoke);
+        assert_eq!(MsgKind::from_msg_type(crate::framing::MSG_TYPE_GZIP), MsgKind::Invoke);
     }
 }

@@ -8,6 +8,25 @@
 //! - size: int (payload size)
 //! (Rust rewrite of the framing layer of `telesrv/internal/mtprotoedge`.)
 
+/// MTProto message type container flag (carries a vector of inner messages).
+pub const MSG_TYPE_MESSAGE_CONTAINER: i32 = 1945237724;
+/// MTProto RPC result envelope (`rpc_result#f35c6d01`).
+pub const MSG_TYPE_RPC_RESULT: i32 = -212046591;
+/// MTProto GZIP envelope used to compress inner RPC payloads.
+pub const MSG_TYPE_GZIP: i32 = 812830625;
+/// MTProto RPC error envelope (`rpc_error#2144ca19`).
+pub const MSG_TYPE_RPC_ERROR: i32 = 558156313;
+/// MTProto initConnection envelope (`initConnection#c1cd5ea9`).
+pub const MSG_TYPE_INIT_CONNECTION: i32 = -1043505495;
+/// MTProto invokeWithLayer envelope (`invokeWithLayer#da9b0d0d`).
+pub const MSG_TYPE_INVOKE_WITH_LAYER: i32 = -627372787;
+/// MTProto invokeWithoutUpdates envelope (`invokeWithoutUpdates#bf9459b7`).
+pub const MSG_TYPE_INVOKE_WITHOUT_UPDATES: i32 = -1080796745;
+/// MTProto invokeAfterMsg envelope (`invokeAfterMsg#cb9f372d`).
+pub const MSG_TYPE_INVOKE_AFTER: i32 = -878758099;
+/// MTProto invokeAfterMsgs envelope (`invokeAfterMsgs#3dc4b4f0`).
+pub const MSG_TYPE_INVOKE_AFTER_MSGS: i32 = 1036301552;
+
 /// MTProto message container header as transmitted on the wire.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MsgHeader {
@@ -64,5 +83,18 @@ mod tests {
     #[test]
     fn decode_rejects_short_buffer() {
         assert!(MsgHeader::decode(&[0u8; 10]).is_err());
+    }
+
+    #[test]
+    fn message_type_constants_are_stable() {
+        assert_eq!(MSG_TYPE_MESSAGE_CONTAINER, 1945237724);
+        assert_eq!(MSG_TYPE_RPC_RESULT, -212046591);
+        assert_eq!(MSG_TYPE_GZIP, 812830625);
+        assert_eq!(MSG_TYPE_RPC_ERROR, 558156313);
+        assert_eq!(MSG_TYPE_INIT_CONNECTION, -1043505495);
+        assert_eq!(MSG_TYPE_INVOKE_WITH_LAYER, -627372787);
+        assert_eq!(MSG_TYPE_INVOKE_WITHOUT_UPDATES, -1080796745);
+        assert_eq!(MSG_TYPE_INVOKE_AFTER, -878758099);
+        assert_eq!(MSG_TYPE_INVOKE_AFTER_MSGS, 1036301552);
     }
 }

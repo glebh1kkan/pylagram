@@ -2,13 +2,34 @@ use std::io;
 use std::net::SocketAddr;
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use pylagram_mtprotoedge::framing;
 use pylagram_mtprotoedge::session::Session;
 use pylagram_mtprotoedge::transport;
+use pylagram_mtprotoedge::wrappers::{MsgKind, MsgWrapper};
 use pylagram_admin::server::{self, AdminState};
+use pylagram_rpc::dispatch::{self, RpcOutcome};
+use pylagram_rpc::errors::{self, RpcError};
+use pylagram_rpc::layers;
+use pylagram_rpc::router::Router;
+use pylagram_rpc::services::AuthService;
 use tokio::net::TcpStream;
 
+/// Builds an MTProto `rpc_error` body from a domain RPC error code.
+fn rpc_error_body(code: i32) -> Vec<u8> {
+    let mut body = Vec::new();
+    body.extend_from_slice(&framing::MSG_TYPE_RPC_ERROR.to_be_bytes());
+    body.extend_from_slice(&code.to_be_bytes());
+    // error message string (small): len + text + zero padding up to multiple of 4
+    let msg = b"RPC_ERROR";
+    body.push(msg.len() as u8);
+    body.extend_from_slice(msg);
+    let total = msg.len() + 1;
+    body.extend(std::iter::repeat(0u8).take((4 - (total % 4)) % 4));
+    body
+}
+
 /// Handles a single MTProto client connection: session -> frame -> decrypt ->
-/// encrypt -> frame.
+/// unwrap -> dispatch -> encrypt -> frame.
 pub async fn handle_connection(mut stream: TcpStream, peer: SocketAddr) -> io::Result<()> {
     let mut session = Session::new();
     let hello = session.begin();
@@ -19,6 +40,10 @@ pub async fn handle_connection(mut stream: TcpStream, peer: SocketAddr) -> io::R
     let mut session_key = [0u8; 32];
     session.accept_client_hello(0, [0u8; 32]);
     session_key = session.derive_session_key().unwrap_or(session_key);
+
+    let mut router = Router::new();
+    // Feature services register their method families here as they are ported.
+    router.register_method("auth", Box::new(AuthService));
 
     loop {
         let mut header = [0u8; 24];
@@ -41,17 +66,47 @@ pub async fn handle_connection(mut stream: TcpStream, peer: SocketAddr) -> io::R
         let Some(plaintext) = plaintext else {
             break;
         };
-        let ciphertext = session
-            .encrypt_message(&session_key, &nonce, &plaintext)
+
+        // Wire: decrypt -> classify wrapper -> extract rpc -> dispatch -> respond.
+        let kind = MsgKind::from_msg_type(msg_type);
+        let wrapper = match MsgWrapper::decode(&plaintext, kind) {
+            Some(wrapper) => wrapper,
+            None => break,
+        };
+
+        let outcome = match wrapper.rpc() {
+            Some(rpc) => {
+                let outcome = match layers::method_name(rpc) {
+                    Some(method) => dispatch::dispatch(&router, method, rpc),
+                    None => RpcOutcome::failure(RpcError::new(errors::ERR_INPUT_REQUEST_INVALID)),
+                };
+                outcome
+            }
+            None => RpcOutcome::not_implemented(),
+        };
+
+        let response_type = if outcome.ok {
+            msg_type
+        } else {
+            framing::MSG_TYPE_RPC_ERROR
+        };
+        let response_body = if outcome.ok {
+            outcome.payload
+        } else {
+            rpc_error_body(outcome.error.map(|e| e.code).unwrap_or(errors::ERR_INPUT_REQUEST_INVALID))
+        };
+
+        let response_ciphertext = session
+            .encrypt_message(&session_key, &nonce, &response_body)
             .unwrap_or_default();
 
         let mut frame = Vec::new();
-        frame.extend_from_slice(&msg_type.to_be_bytes());
+        frame.extend_from_slice(&response_type.to_be_bytes());
         frame.extend_from_slice(&msg_id.to_be_bytes());
         frame.extend_from_slice(&seqno.to_be_bytes());
         frame.extend_from_slice(&seq.to_be_bytes());
-        frame.extend_from_slice(&size.to_be_bytes());
-        frame.extend_from_slice(&ciphertext);
+        frame.extend_from_slice(&(response_ciphertext.len() as i32).to_be_bytes());
+        frame.extend_from_slice(&response_ciphertext);
         stream.write_all(&frame).await?;
     }
 
