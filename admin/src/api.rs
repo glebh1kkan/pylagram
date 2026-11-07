@@ -67,6 +67,8 @@ pub fn handle(
         ("GET", "/api/session") => handle_session(state),
         ("POST", "/api/logout") => handle_logout(state),
         ("GET", "/api/dashboard") => handle_dashboard(state),
+        ("GET", "/api/overview") => handle_overview(state),
+        ("GET", "/api/activity") => handle_activity(state, &query),
         ("GET", "/api/accounts") => handle_accounts(state, &query),
         ("GET", "/api/accounts/shared-devices") => handle_shared_devices(state, &query),
         ("GET", "/api/accounts/{id}") => handle_account_detail(state, &segments),
@@ -155,6 +157,30 @@ fn handle_logout(state: &AdminState) -> HandlerResult {
 
 fn handle_dashboard(state: &AdminState) -> HandlerResult {
     (200, state.service.get("resp/dashboard"))
+}
+
+/// Aggregated dashboard payload: one round trip instead of four for the shell,
+/// counters, host telemetry and the first page of recent activity.
+fn handle_overview(state: &AdminState) -> HandlerResult {
+    (
+        200,
+        json!({
+            "stats": state.stats_json(),
+            "dashboard": state.service.get("resp/dashboard"),
+            "status": state.service.get("resp/server/status"),
+            "identity": state.service.get("resp/server/identity"),
+            "activity": state.activity_json(8),
+        }),
+    )
+}
+
+fn handle_activity(state: &AdminState, query: &str) -> HandlerResult {
+    let params = query_params(query);
+    let limit = params
+        .get("limit")
+        .and_then(|value| value.parse::<usize>().ok())
+        .unwrap_or(25);
+    (200, state.activity_json(limit))
 }
 
 fn handle_accounts(state: &AdminState, query: &str) -> HandlerResult {
